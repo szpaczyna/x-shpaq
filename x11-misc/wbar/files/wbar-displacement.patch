@@ -1,0 +1,328 @@
+--- ./share/wbar.glade.bk	2012-06-15 17:52:40.000000000 -0300
++++ ./share/wbar.glade	2012-07-19 22:31:47.000000000 -0300
+@@ -954,7 +954,7 @@
+                         <property name="secondary_icon_activatable">False</property>
+                         <property name="primary_icon_sensitive">True</property>
+                         <property name="secondary_icon_sensitive">True</property>
+-                        <property name="adjustment">0 0 200 1 0 0</property>
++                        <property name="adjustment">0 -100 400 1 0 0</property>
+                       </widget>
+                       <packing>
+                         <property name="left_attach">1</property>
+@@ -965,8 +965,8 @@
+                       </packing>
+                     </child>
+                     <child>
+-                      <widget class="GtkCheckButton" id="checkbutton_noreload">
+-                        <property name="label" translatable="yes">No reload bar</property>
++                      <widget class="GtkCheckButton" id="checkbutton_displace">
++                        <property name="label" translatable="yes">Displacement</property>
+                         <property name="visible">True</property>
+                         <property name="can_focus">True</property>
+                         <property name="receives_default">False</property>
+@@ -979,8 +979,28 @@
+                       </packing>
+                     </child>
+                     <child>
+-                      <widget class="GtkCheckButton" id="checkbutton_taskbar">
+-                        <property name="label" translatable="yes">Enable taskbar</property>
++                      <widget class="GtkSpinButton" id="spinbutton_displace">
++                        <property name="visible">True</property>
++                        <property name="sensitive">False</property>
++                        <property name="can_focus">True</property>
++                        <property name="invisible_char">•</property>
++                        <property name="primary_icon_activatable">False</property>
++                        <property name="secondary_icon_activatable">False</property>
++                        <property name="primary_icon_sensitive">True</property>
++                        <property name="secondary_icon_sensitive">True</property>
++                        <property name="adjustment">0 -100 800 1 0 0</property>
++                      </widget>
++                      <packing>
++                        <property name="left_attach">1</property>
++                        <property name="right_attach">2</property>
++                        <property name="top_attach">7</property>
++                        <property name="bottom_attach">8</property>
++                        <property name="x_options">GTK_FILL</property>
++                      </packing>
++                    </child>
++                    <child>
++                      <widget class="GtkCheckButton" id="checkbutton_noreload">
++                        <property name="label" translatable="yes">No reload bar</property>
+                         <property name="visible">True</property>
+                         <property name="can_focus">True</property>
+                         <property name="receives_default">False</property>
+@@ -993,6 +1013,20 @@
+                       </packing>
+                     </child>
+                     <child>
++                      <widget class="GtkCheckButton" id="checkbutton_taskbar">
++                        <property name="label" translatable="yes">Enable taskbar</property>
++                        <property name="visible">True</property>
++                        <property name="can_focus">True</property>
++                        <property name="receives_default">False</property>
++                        <property name="use_action_appearance">False</property>
++                        <property name="draw_indicator">True</property>
++                      </widget>
++                      <packing>
++                        <property name="top_attach">9</property>
++                        <property name="bottom_attach">10</property>
++                      </packing>
++                    </child>
++                    <child>
+                       <widget class="GtkCheckButton" id="checkbutton_grow">
+                         <property name="label" translatable="yes">Investing icons growth</property>
+                         <property name="visible">True</property>
+@@ -1016,8 +1050,8 @@
+                         <property name="draw_indicator">True</property>
+                       </widget>
+                       <packing>
+-                        <property name="top_attach">9</property>
+-                        <property name="bottom_attach">10</property>
++                        <property name="top_attach">10</property>
++                        <property name="bottom_attach">11</property>
+                       </packing>
+                     </child>
+                     <child>
+@@ -1035,8 +1069,8 @@
+                       <packing>
+                         <property name="left_attach">1</property>
+                         <property name="right_attach">2</property>
+-                        <property name="top_attach">9</property>
+-                        <property name="bottom_attach">10</property>
++                        <property name="top_attach">10</property>
++                        <property name="bottom_attach">11</property>
+                         <property name="x_options">GTK_FILL</property>
+                       </packing>
+                     </child>
+--- ./src/core/Bar.h.bk	2012-06-14 22:06:26.000000000 -0300
++++ ./src/core/Bar.h	2012-07-19 19:53:08.000000000 -0300
+@@ -23,6 +23,8 @@
+ 
+     /* offset bar */
+     int bOffset;
++    /* bar displacement */
++    int bDisplace;
+     /* dist. between */
+     int icon_dist;
+     /* icon size */
+@@ -81,7 +83,7 @@
+ public:
+ 
+     Bar(XWin *win, std::string barImg, int iSize, int iDist, float zFactor,
+-        float jFactor, int bOrient, int bPosition, int nAnim, int offset, bool grow);
++        float jFactor, int bOrient, int bPosition, int nAnim, int offset, int displace, bool grow);
+ 
+     virtual ~Bar();
+ 
+--- ./src/core/Bar.cc.bk	2012-06-14 22:06:26.000000000 -0300
++++ ./src/core/Bar.cc	2012-07-19 21:32:29.000000000 -0300
+@@ -18,7 +18,7 @@
+ /* Bar Constructor & Destructor */
+ Bar::Bar(XWin *win, string barImg, int iSize, int iDist, float zFactor,
+         float jFactor, int bOrient, int bPosition, int nAnim,
+-        int offset, bool grow) :
++        int offset, int displace, bool grow) :
+ 
+ /* Initialization */
+     buffer(0), cleaning_buffer(0), barback(0), bar(0), window(win), icon_dist(iDist),
+@@ -27,6 +27,7 @@
+ {
+ 
+     this->bOffset = offset;
++    this->bDisplace = displace;
+     this->grow = grow;
+ 
+     /* Load Bar back ground */
+@@ -148,10 +149,13 @@
+ /* Acquire background */
+ void Bar::acquireBack()
+ {
+-    int t_w, t_h;
++    int t_w, t_h, dx, dy;
+ 
+     t_w = (orientation == 0)? window->w : window->h;
+     t_h = (orientation == 0)? window->h : window->w;
++    
++    dx = (orientation == 0)? bDisplace : bOffset;
++    dy = (orientation == 0)? bOffset   : bDisplace;
+ 
+     /* Update win x && y for getting root img */
+     switch (position)
+@@ -159,19 +163,19 @@
+     case 1: // bottom
+     case 2: // top
+     case 5: // center
+-        window->x = (window->screenWidth() - t_w)/2;
++        window->x = (window->screenWidth() - t_w)/2 + dx;
+         break;
+ 
+     case 3: // left
+     case 7: // bot-left
+     case 9: // top-left
+-        window->x = bOffset;
++        window->x = dx;
+         break;
+ 
+     case 4: // rigth
+     case 6: // bot-rigth
+     case 8: // top-rigth
+-        window->x = window->screenWidth() - t_w - bOffset;
++        window->x = window->screenWidth() - t_w - dx;
+         break;
+     }
+ 
+@@ -180,19 +184,19 @@
+     case 3: // left
+     case 4: // rigth
+     case 5: // center
+-        window->y = (window->screenHeight() - t_h)/2;
++        window->y = (window->screenHeight() - t_h)/2 + dy;
+         break;
+ 
+     case 1: // bottom
+     case 6: // bot-right
+     case 7: // bot-left
+-        window->y = window->screenHeight() - t_h - bOffset;
++        window->y = window->screenHeight() - t_h - dy;
+         break;
+ 
+     case 2: // top
+     case 8: // top-right
+     case 9: // top-left
+-        window->y = bOffset;
++        window->y = dy;
+         break;
+     }
+     /*}}}*/
+--- ./src/core/SuperBar.cc.bk	2012-06-14 22:06:26.000000000 -0300
++++ ./src/core/SuperBar.cc	2012-07-19 21:38:54.000000000 -0300
+@@ -9,9 +9,9 @@
+ /* Super Constructor *//*{{{*/
+ SuperBar::SuperBar(XWin *win, string barImg, string barFont, int iSize, int iDist, 
+     float zFactor, float jFactor, int bOrient, int bPosition, int nAnim, int barAlfa, 
+-    int unfocusAlfa, int filtSel, unsigned int filtCol, bool dfont, int offset, bool grow) :
++    int unfocusAlfa, int filtSel, unsigned int filtCol, bool dfont, int offset, int displace, bool grow) :
+ 
+-    Bar(win, barImg, iSize, iDist, zFactor, jFactor, bOrient, bPosition, nAnim, offset, grow),
++    Bar(win, barImg, iSize, iDist, zFactor, jFactor, bOrient, bPosition, nAnim, offset, displace, grow),
+     font(NULL), drawfont(dfont), rest_w(0), filtSel(filtSel), filtRed((filtCol & 0x00ff0000)>>16), 
+     filtGreen((filtCol & 0x0000ff00)>>8), filtBlue(filtCol & 0x000000ff),
+     filtAlfa((filtCol & 0xff000000)>>24), unfocusAlfa(unfocusAlfa), barAlfa(barAlfa) { 
+--- ./src/core/Main.cc.bk	2012-06-26 17:06:18.000000000 -0300
++++ ./src/core/Main.cc	2012-07-19 21:36:38.000000000 -0300
+@@ -138,14 +138,15 @@
+             std::cout << "   --above-desk       " << _("run over a desktop app (ie: xfdesktop)") << std::endl;
+             std::cout << "   --taskbar		" << _("enable taskbar") << std::endl;
+             std::cout << "   --noreload         " << _("right click does not force reload anymore") << std::endl;
+-            std::cout << "   --offset i         " << _("offset bar (eg: 20)") << std::endl;
+-            std::cout << "   --isize  i         " << _("icon size (eg: 32)") << std::endl;
+-            std::cout << "   --idist  d         " << _("icon dist (eg: 1)") << std::endl;
+-            std::cout << "   --zoomf  z         " << _("zoom factor (eg: 1.8 or 2.5)") << std::endl;
+-            std::cout << "   --jumpf  j         " << _("jump factor (eg: 1.0 or 0.0)") << std::endl;
+-            std::cout << "   --pos    p         " << _("position:") << std::endl;
+-            std::cout << "                        " << "top | bottom | left | right | " << std::endl;
+-            std::cout << "                        " << "center | <bot|top>-<right|left>" << std::endl;
++            std::cout << "   --offset   i       " << _("offset bar (eg: 20)") << std::endl;
++            std::cout << "   --displace i       " << _("bar displacement (eg: 20)") << std::endl;
++            std::cout << "   --isize    i       " << _("icon size (eg: 32)") << std::endl;
++            std::cout << "   --idist    d       " << _("icon dist (eg: 1)") << std::endl;
++            std::cout << "   --zoomf    z       " << _("zoom factor (eg: 1.8 or 2.5)") << std::endl;
++            std::cout << "   --jumpf    j       " << _("jump factor (eg: 1.0 or 0.0)") << std::endl;
++            std::cout << "   --pos      p       " << _("position:") << std::endl;
++            std::cout << "                      " << "top | bottom | left | right | " << std::endl;
++            std::cout << "                      " << "center | <bot|top>-<right|left>" << std::endl;
+             std::cout << "   --grow             " << _("investing icons growth") << std::endl;
+             std::cout << "   --dblclk ms        " << _("ms for double click (0: single click)") << std::endl;
+             std::cout << "   --sleep  ms        " << _("ms sleep time before full load (0: no delay)") << std::endl;
+@@ -235,6 +236,7 @@
+                     strtoul((optparser.isSet(OptParser::FC)?optparser.getArg(OptParser::OptParser::FC).c_str():"0xff00c800"), NULL, 16),
+                     optparser.isSet(OptParser::NOFONT)?0:1,
+                     optparser.isSet(OptParser::OFFSET)?atoi(optparser.getArg(OptParser::OFFSET).c_str()):0,
++                    optparser.isSet(OptParser::DISPLACE)?atoi(optparser.getArg(OptParser::DISPLACE).c_str()):0,
+                     grow);
+         }
+         else
+@@ -248,6 +250,7 @@
+                     4,
+                     optparser.isSet(OptParser::NANIM)?atoi(optparser.getArg(OptParser::NANIM).c_str()):5,
+                     optparser.isSet(OptParser::OFFSET)?atoi(optparser.getArg(OptParser::OFFSET).c_str()):0,
++                    optparser.isSet(OptParser::DISPLACE)?atoi(optparser.getArg(OptParser::DISPLACE).c_str()):0,
+                     grow);
+         }
+ 
+--- ./src/core/SuperBar.h.bk	2012-06-14 22:06:26.000000000 -0300
++++ ./src/core/SuperBar.h	2012-07-19 21:39:57.000000000 -0300
+@@ -38,7 +38,7 @@
+     public:
+ 	SuperBar(XWin *win, std::string barImg, std::string barFont, int iSize, int iDist, 
+ 		float zFactor, float jFactor, int bOrient, int bPosition, int nAnim,
+-		int barAlfa, int unfocusAlfa, int filtSel, unsigned int filtCol, bool dfont, int offset, bool grow);
++		int barAlfa, int unfocusAlfa, int filtSel, unsigned int filtCol, bool dfont, int offset, int displace, bool grow);
+ 
+ 	~SuperBar();
+ 
+--- ./src/config/Functions.cc.bk	2012-06-26 19:18:28.000000000 -0300
++++ ./src/config/Functions.cc	2012-07-19 21:50:25.000000000 -0300
+@@ -383,6 +383,13 @@
+         spinbutton = glade_xml_get_widget (xml, "spinbutton_offset");
+         gtk_spin_button_set_value (GTK_SPIN_BUTTON (spinbutton), atoi(opt.getArg(OptParser::OFFSET).c_str()));
+     }
++    if(opt.isSet(OptParser::DISPLACE))
++    {
++        checkbutton = glade_xml_get_widget (xml, "checkbutton_displace");
++        gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (checkbutton), true);
++        spinbutton = glade_xml_get_widget (xml, "spinbutton_displace");
++        gtk_spin_button_set_value (GTK_SPIN_BUTTON (spinbutton), atoi(opt.getArg(OptParser::DISPLACE).c_str()));
++    }
+     if(opt.isSet(OptParser::NORELOAD))
+     {
+         checkbutton = glade_xml_get_widget (xml, "checkbutton_noreload");
+@@ -566,6 +573,10 @@
+     widget = glade_xml_get_widget (xml, "spinbutton_offset");
+     g_signal_connect (G_OBJECT (check), "toggled", G_CALLBACK (checkbutton_toggled), widget);
+ 
++    check = glade_xml_get_widget (xml, "checkbutton_displace");
++    widget = glade_xml_get_widget (xml, "spinbutton_displace");
++    g_signal_connect (G_OBJECT (check), "toggled", G_CALLBACK (checkbutton_toggled), widget);
++
+     check = glade_xml_get_widget (xml, "checkbutton_rsize");
+     widget = glade_xml_get_widget (xml, "spinbutton_rsize");
+     g_signal_connect (G_OBJECT (check), "toggled", G_CALLBACK (checkbutton_toggled), widget);
+@@ -926,6 +937,17 @@
+         sprintf(text, " %d", (int)gtk_spin_button_get_value (GTK_SPIN_BUTTON (spinbutton)));
+         command += text;
+     }
++
++    checkbutton = glade_xml_get_widget (xml, "checkbutton_displace");
++
++    if (gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (checkbutton)))
++    {
++        char text[10];
++        command += " --displace";
++        spinbutton = glade_xml_get_widget (xml, "spinbutton_displace");
++        sprintf(text, " %d", (int)gtk_spin_button_get_value (GTK_SPIN_BUTTON (spinbutton)));
++        command += text;
++    }
+ 
+     checkbutton = glade_xml_get_widget (xml, "checkbutton_noreload");
+ 
+--- ./src/utils/OptParser.h.bk	2012-06-15 17:55:14.000000000 -0300
++++ ./src/utils/OptParser.h	2012-07-19 21:42:57.000000000 -0300
+@@ -30,6 +30,7 @@
+ 	    FILTER,
+ 	    FC,
+ 	    OFFSET,
++	    DISPLACE,
+ 	    NORELOAD,
+ 	    TASKBAR,
+ 	    RSIZE,
+--- ./src/utils/OptParser.cc.bk	2012-06-15 21:39:33.000000000 -0300
++++ ./src/utils/OptParser.cc	2012-07-19 21:42:07.000000000 -0300
+@@ -22,6 +22,7 @@
+     {"filter", 1, 0, 0},
+     {"fc", 1, 0, 0},
+     {"offset", 1, 0, 0 },
++    {"displace", 1, 0, 0 },
+     {"noreload", 0, 0, 0 },
+     {"taskbar", 0, 0, 0 },
+     {"rsize", 1, 0, 0 },
